@@ -1,0 +1,571 @@
+/********************************** (C) COPYRIGHT *******************************
+* File Name          : Main.C
+* Author             : Jiang Di
+* Version            : V1.0
+* Date               : 2018/12/03
+* Description        : Debug Code for GPIO
+*******************************************************************************/                                                 
+#include "CH552.h"
+#include "stdio.h"
+#include "intrins.h"
+
+sbit LED = P1^1;
+sbit Button = P1^4;
+sbit SSW = P3^2;
+
+#define	 FREQ_SYS	    24000000
+#define  numPixels 15
+
+#pragma  NOAREGS
+void CfgFsys();
+void mDelayuS( UINT16 n );
+void mDelaymS( UINT16 n );
+void Port1Cfg(UINT8 Mode,UINT8 Pin);
+void Port3Cfg(UINT8 Mode,UINT8 Pin);
+void Code0();
+void Code1();
+void Code_Reset();
+
+void LED_Init();
+void LED_begin();
+void LED_show();
+void Send_Led_Data(UINT8 g,UINT8 r,UINT8 b);
+void setPixelColor(UINT8 Nums,UINT8 g,UINT8 r,UINT8 b);
+void LED_setBrightness(UINT8 Brightness_Set);
+void LED_colorWipe(UINT8 wait,UINT8 color_num);
+void Wheel(UINT8 WheelPos);
+void LED_Rainbow();
+
+void text_load(const UINT8* imageArray);
+void displayImage();
+void showImage();
+void btnpress();
+
+UINT8 Brightness = 256;
+UINT8 tempImage[192];
+UINT8 count=0;
+UINT16 flow=0;
+struct color
+{
+        UINT8 green;
+        UINT8 red;
+        UINT8 blue;
+};
+
+struct color Color_Array[] = {
+    {0xFF, 0x00, 0x00},     
+    {0x00, 0xFF, 0x00}, 		
+    {0x00, 0x00, 0xFF}, 		
+    {0xFF, 0xFF, 0x00},     
+    {0xFF, 0x00, 0xFF}, 		
+    {0x00, 0x00, 0xFF},     
+    {0x8B, 0x00, 0xFF},     
+    {0x00, 0x00, 0x00},			
+		{0x00, 0x00, 0x00},
+};
+
+const UINT8 code text0[] = {
+0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+};
+const UINT8 code text1[] = {
+0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+};
+const UINT8 code text2[] = {
+0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+};
+const UINT8 code text3[] = {
+0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+};
+const UINT8 code text4[] = {
+0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+};
+const UINT8 code text5[] = {
+0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+};
+
+void main( ) 
+{
+	UINT8 j=0;
+	CfgFsys( );
+	mDelaymS(20);
+	
+	Port3Cfg(1,2);
+	Port1Cfg(1,4);
+	Port1Cfg(1,1);
+	
+	LED = 0;	
+	LED_Init();
+	LED_colorWipe(30,0);
+	LED_colorWipe(30,1);
+	LED_colorWipe(30,2);
+	LED_colorWipe(30,3);
+	LED_colorWipe(30,4);
+	LED_colorWipe(30,5);
+	LED_colorWipe(30,6);
+	LED_Rainbow();
+	LED_begin();
+	while(Button == 0);
+	text_load(text0);
+	count=0;
+	while(1)
+	{
+		if(SSW==0){
+		displayImage();
+		while(SSW == 0);
+		btnpress();
+		}
+		btnpress();
+	}
+
+}
+
+void btnpress()
+{
+	  if (Button==0) {   // 如果按键按下
+    mDelaymS(20);                        // 延迟20ms，去抖动
+    if (Button==0) { // 再次检测按键是否按下，若按下则执行以下操作
+      count++;  count%=6;            // 文字指针加1
+      switch(count) {                 // 拷贝相应的文字
+        case 0:
+          text_load(text0);
+          break;
+        case 1: 
+          text_load(text1);
+          break;
+        case 2:
+          text_load(text2);
+          break;
+        case 3:
+          text_load(text3);
+          break;
+        case 4:
+          text_load(text4);
+          break;
+        case 5:
+          text_load(text5);
+          break;
+         default: 
+          text_load(text0);
+          break;
+      }  //switch
+      while(Button==0);   // 等待按键释放      
+    } 
+  }
+}
+
+
+void showImage()
+{
+	UINT16 temp=0xffff;
+	UINT8 i=0;
+	UINT8 j=0;
+	mDelaymS(80);
+	 for(i=0 ; i<64 ; i++){
+    temp = (tempImage[i*2+1]<<8) + tempImage[i*2];  //将表示一列的两个字节数据存入temp
+    for(j=0; j<16; j++){
+        if (temp & 0x0001)    // 当前位需要点亮对应灯珠
+				{
+        Wheel(((((i * 256 / 15) + j + 80*flow)/8)&0xff));
+				setPixelColor(15-j,Color_Array[8].green,Color_Array[8].red,Color_Array[8].blue);
+				//setPixelColor(15-j,Color_Array[1].green,Color_Array[1].red,Color_Array[1].blue);  					
+				}
+				else                           // 当前位不需要点亮对应灯珠
+          setPixelColor(15-j,0,0,0);
+        temp = temp>>1;                // 处理下一位数据
+    }
+    LED_show();                      // 处理完一列数据，刷新显示
+  }
+	 for(i=0; i<16; i++)              // 熄灭所有灯珠
+    setPixelColor(i,0,0,0);
+  LED_show();                        // 刷新显示
+  flow++;
+}
+
+void displayImage()
+{
+	switch(count)
+		{
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5: showImage();break;
+		default:showImage();break;
+		}
+}
+void text_load(const UINT8* imageArray)
+{
+	UINT8 i=0;
+	for(i=0; i<160; i++)   //简单起见，始终拷贝连续5个汉字的数据
+  tempImage[i]=imageArray[i];
+}
+void LED_Init()
+{
+		LED_begin();
+		LED_show();
+		LED_setBrightness(30);
+}
+void LED_show()
+{
+	Code_Reset();
+}
+void LED_begin()
+{
+	UINT8 i;
+	for(i=0;i<=numPixels;i++)
+	{
+	setPixelColor(numPixels,0x00,0x00,0x00);
+	Code_Reset();
+	}
+	}
+
+void LED_Rainbow()
+{
+	UINT8 i=0;
+	UINT8 j=0;
+	for(j=0;j<256*5;j++)
+	{
+	for(i=0;i<=numPixels;i++)
+		{
+		Wheel(((i*256/numPixels+j)&0xff));
+			setPixelColor(i,Color_Array[8].green,Color_Array[8].red,Color_Array[8].blue);
+		}
+		//LED_show();
+		//mDelaymS(10);
+		if((Button == 0)||(SSW == 0))break;
+	}
+
+}
+
+void LED_colorWipe(UINT8 wait,UINT8 color_num)
+{
+	UINT8 i=0;
+	for(i=0;i<=numPixels;i++)
+	{
+		setPixelColor(i,Color_Array[color_num].green,Color_Array[color_num].red,Color_Array[color_num].blue);
+		LED_show();
+		mDelaymS(wait);
+	}
+}
+
+void LED_setBrightness(UINT8 Brightness_Set)
+{
+	UINT8 i=0;
+	Brightness=Brightness_Set;
+	for(i=0;i<=7;i++)
+	{
+		Color_Array[i].red   =Color_Array[i].red/256.0*Brightness;
+		Color_Array[i].green =Color_Array[i].green/256.0*Brightness;
+		Color_Array[i].blue	 =Color_Array[i].blue/256.0*Brightness;
+	}
+	
+}
+
+void setPixelColor(UINT8 Nums,UINT8 g,UINT8 r,UINT8 b)
+{
+	UINT8 j=0;
+	for(j=0;j<Nums;j++)
+	{
+		Send_Led_Data(0,0,0);
+	}
+	Send_Led_Data(g,r,b);
+}
+
+void Wheel(UINT8 WheelPos)
+{
+	if(WheelPos < 85) {        // 若x<85,颜色设置为(3x,255-3x,0)
+    Color_Array[8].red=(WheelPos * 3)/255.0*Brightness; 
+		Color_Array[8].green=(255 - WheelPos * 3)/255.0*Brightness;
+		Color_Array[8].blue=0;
+  } 
+  else if(WheelPos < 170) {  // 若85<=x<170,x=x-85，颜色设置为(255-3x,0,3x)
+    WheelPos -= 85;
+    Color_Array[8].red=(255 - WheelPos * 3)/255.0*Brightness;
+		Color_Array[8].green=0;
+		Color_Array[8].blue=(WheelPos * 3)/255.0*Brightness;
+  } 
+  else {                     // 若85x>=170,x=x-170，颜色设置为(0,3x,255-3x)  
+    WheelPos -= 170;
+    Color_Array[8].red=0;
+		Color_Array[8].green=(WheelPos * 3)/255.0*Brightness;
+		Color_Array[8].blue=(255 - WheelPos * 3)/255.0*Brightness;
+	}
+}
+
+/*******************************************************************************
+* Function Name  : Send_Led_Data(UNIT8 g,UINT8 r,UINT8 b)
+* Description    : 发送LED灯数据
+* Input          : r(0-255) g(0-255) b(0-255) 代表256级亮度
+* Output         : 
+* Return         : None
+*******************************************************************************/ 
+void Send_Led_Data(UINT8 g,UINT8 r,UINT8 b)
+{
+		UINT8 a;
+	 for(a=0;a<8;a++)
+        {
+            if(g&0x80)
+							Code1();
+            else
+							Code0();
+            g=g<<1;
+        }
+				
+		for(a=8;a<16;a++)
+        {
+            if(r&0x80)
+							Code1();
+            else
+							Code0();
+
+            r=r<<1;
+        }
+				
+    for(a=16;a<24;a++)
+        {
+            if(b&0x80)
+							Code1();
+            else
+							Code0();
+
+            b=b<<1;
+        }
+				
+}
+
+/*******************************************************************************
+* Function Name  : CfgFsys( )
+* Description    : CH554时钟选择和配置函数,默认使用Fsys 6MHz，FREQ_SYS可以通过
+                   CLOCK_CFG配置得到，公式如下：
+                   Fsys = (Fosc * 4/(CLOCK_CFG & MASK_SYS_CK_SEL);具体时钟需要自己配置 
+* Input          : None
+* Output         : None
+* Return         : None
+*******************************************************************************/ 
+void	CfgFsys( )  
+{
+		SAFE_MOD = 0x55;
+		SAFE_MOD = 0xAA;
+#if FREQ_SYS == 24000000	
+		CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x06;  // 24MHz	
+#endif	
+#if FREQ_SYS == 16000000		
+		CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x05;  // 16MHz	
+#endif
+#if FREQ_SYS == 12000000		
+		CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x04;  // 12MHz
+#endif	
+#if FREQ_SYS == 6000000		
+		CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x03;  // 6MHz	
+#endif	
+#if FREQ_SYS == 3000000	
+		CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x02;  // 3MHz	
+#endif
+#if FREQ_SYS == 750000	
+		CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x01;  // 750KHz
+#endif
+#if FREQ_SYS == 187500	
+		CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x00;  // 187.5KHz	
+#endif
+		SAFE_MOD = 0x00;
+}
+
+/*******************************************************************************
+* Function Name  : mDelayus(UNIT16 n)
+* Description    : us延时函数
+* Input          : UNIT16 n
+* Output         : None
+* Return         : None
+*******************************************************************************/ 
+void	mDelayuS( UINT16 n )  // 以uS为单位延时
+{
+#ifdef	FREQ_SYS
+#if		FREQ_SYS <= 6000000
+		n >>= 2;
+#endif
+#if		FREQ_SYS <= 3000000
+		n >>= 2;
+#endif
+#if		FREQ_SYS <= 750000
+		n >>= 4;
+#endif
+#endif
+	while ( n ) {  // total = 12~13 Fsys cycles, 1uS @Fsys=12MHz
+		++ SAFE_MOD;  // 2 Fsys cycles, for higher Fsys, add operation here
+#ifdef	FREQ_SYS
+#if		FREQ_SYS >= 14000000
+		++ SAFE_MOD;
+#endif
+#if		FREQ_SYS >= 16000000
+		++ SAFE_MOD;
+#endif
+#if		FREQ_SYS >= 18000000
+		++ SAFE_MOD;
+#endif
+#if		FREQ_SYS >= 20000000
+		++ SAFE_MOD;
+#endif
+#if		FREQ_SYS >= 22000000
+		++ SAFE_MOD;
+#endif
+#if		FREQ_SYS >= 24000000
+		++ SAFE_MOD;
+#endif
+#endif
+		-- n;
+	}
+}
+/*******************************************************************************
+* Function Name  : mDelayms(UNIT16 n)
+* Description    : ms延时函数
+* Input          : UNIT16 n
+* Output         : None
+* Return         : None
+*******************************************************************************/
+void	mDelaymS( UINT16 n )                                                  // 以mS为单位延时
+{
+	while ( n ) {
+
+		mDelayuS( 1000 );
+		-- n;
+	}
+}             
+/*******************************************************************************
+* Function Name  : Port1Cfg()
+* Description    : 端口1配置
+* Input          : Mode  0 = 浮空输入，无上拉
+                         1 = 推挽输入输出
+                         2 = 开漏输入输出，无上拉
+                         3 = 类51模式，开漏输入输出，有上拉，内部电路可以加速由低到高的电平爬升		
+                   ,UINT8 Pin	(0-7)											 
+* Output         : None
+* Return         : None
+*******************************************************************************/
+void Port1Cfg(UINT8 Mode,UINT8 Pin)
+{
+  switch(Mode){
+    case 0:
+      P1_MOD_OC = P1_MOD_OC & ~(1<<Pin);
+      P1_DIR_PU = P1_DIR_PU &	~(1<<Pin);	
+      break;
+    case 1:
+      P1_MOD_OC = P1_MOD_OC & ~(1<<Pin);
+      P1_DIR_PU = P1_DIR_PU |	(1<<Pin);				
+      break;		
+    case 2:
+      P1_MOD_OC = P1_MOD_OC | (1<<Pin);
+      P1_DIR_PU = P1_DIR_PU &	~(1<<Pin);				
+      break;		
+    case 3:
+      P1_MOD_OC = P1_MOD_OC | (1<<Pin);
+      P1_DIR_PU = P1_DIR_PU |	(1<<Pin);			
+      break;
+    default:
+      break;			
+  }
+}
+
+/*******************************************************************************
+* Function Name  : Port3Cfg()
+* Description    : 端口3配置
+* Input          : Mode  0 = 浮空输入，无上拉
+                         1 = 推挽输入输出
+                         2 = 开漏输入输出，无上拉
+                         3 = 类51模式，开漏输入输出，有上拉，内部电路可以加速由低到高的电平爬升		
+                   ,UINT8 Pin	(0-7)											 
+* Output         : None
+* Return         : None
+*******************************************************************************/
+void Port3Cfg(UINT8 Mode,UINT8 Pin)
+{
+  switch(Mode){
+    case 0:
+      P3_MOD_OC = P3_MOD_OC & ~(1<<Pin);
+      P3_DIR_PU = P3_DIR_PU &	~(1<<Pin);	
+      break;
+    case 1:
+      P3_MOD_OC = P3_MOD_OC & ~(1<<Pin);
+      P3_DIR_PU = P3_DIR_PU |	(1<<Pin);				
+      break;		
+    case 2:
+      P3_MOD_OC = P3_MOD_OC | (1<<Pin);
+      P3_DIR_PU = P3_DIR_PU &	~(1<<Pin);				
+      break;		
+    case 3:
+      P3_MOD_OC = P3_MOD_OC | (1<<Pin);
+      P3_DIR_PU = P3_DIR_PU |	(1<<Pin);			
+      break;
+    default:
+      break;			
+  }
+}
+
+//实测 高电平340ns 低电平924s
+void Code0()
+{
+
+	LED = 1;
+	_nop_();_nop_();_nop_();_nop_();_nop_();_nop_();_nop_();
+	LED = 0;
+	_nop_();_nop_();_nop_();_nop_();_nop_();_nop_();
+}
+
+//实测 高电平620ns	低电平700ns
+void Code1()
+{
+	LED	= 1;
+	_nop_();_nop_();_nop_();_nop_();_nop_();_nop_();
+	_nop_();_nop_();_nop_();_nop_();_nop_();_nop_();_nop_();
+  LED = 0;
+	_nop_();
+}
+
+//实测 低电平50us
+void Code_Reset()
+{
+	mDelayuS(35);
+}
+

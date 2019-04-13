@@ -1,0 +1,616 @@
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: F:\Keil_v5\C51\BIN\C51.EXE main.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\Public;.\GPIO) DEBUG OBJE
+                    -CTEXTEND PRINT(.\Listings\main.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          /********************************** (C) COPYRIGHT *******************************
+   2          * File Name          : Main.C
+   3          * Author             : Jiang Di
+   4          * Version            : V1.0
+   5          * Date               : 2018/12/03
+   6          * Description        : Debug Code for GPIO
+   7          *******************************************************************************/                          
+             -                       
+   8          #include "CH552.h"
+   9          #include "stdio.h"
+  10          #include "intrins.h"
+  11          
+  12          sbit LED = P1^1;
+  13          sbit Button = P1^4;
+  14          sbit SSW = P3^2;
+  15          
+  16          #define  FREQ_SYS     24000000
+  17          #define  numPixels 15
+  18          
+  19          #pragma  NOAREGS
+  20          void CfgFsys();
+  21          void mDelayuS( UINT16 n );
+  22          void mDelaymS( UINT16 n );
+  23          void Port1Cfg(UINT8 Mode,UINT8 Pin);
+  24          void Port3Cfg(UINT8 Mode,UINT8 Pin);
+  25          void Code0();
+  26          void Code1();
+  27          void Code_Reset();
+  28          
+  29          void LED_Init();
+  30          void LED_begin();
+  31          void LED_show();
+  32          void Send_Led_Data(UINT8 g,UINT8 r,UINT8 b);
+  33          void setPixelColor(UINT8 Nums,UINT8 g,UINT8 r,UINT8 b);
+  34          void LED_setBrightness(UINT8 Brightness_Set);
+  35          void LED_colorWipe(UINT8 wait,UINT8 color_num);
+  36          void Wheel(UINT8 WheelPos);
+  37          void LED_Rainbow();
+  38          
+  39          void text_load(const UINT8* imageArray);
+  40          void displayImage();
+  41          void showImage();
+  42          void btnpress();
+  43          
+  44          UINT8 Brightness = 256;
+  45          UINT8 tempImage[192];
+  46          UINT8 count=0;
+  47          UINT16 flow=0;
+  48          struct color
+  49          {
+  50                  UINT8 green;
+  51                  UINT8 red;
+  52                  UINT8 blue;
+  53          };
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 2   
+
+  54          
+  55          struct color Color_Array[] = {
+  56              {0xFF, 0x00, 0x00},     
+  57              {0x00, 0xFF, 0x00},     
+  58              {0x00, 0x00, 0xFF},     
+  59              {0xFF, 0xFF, 0x00},     
+  60              {0xFF, 0x00, 0xFF},     
+  61              {0x00, 0x00, 0xFF},     
+  62              {0x8B, 0x00, 0xFF},     
+  63              {0x00, 0x00, 0x00},     
+  64              {0x00, 0x00, 0x00},
+  65          };
+  66          
+  67          const UINT8 code text0[] = {
+  68          0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+  69          0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+  70          0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+  71          0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+  72          0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+  73          0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+  74          0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+  75          0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+  76          };
+  77          const UINT8 code text1[] = {
+  78          0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+  79          0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+  80          0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+  81          0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+  82          0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+  83          0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+  84          0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+  85          0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+  86          };
+  87          const UINT8 code text2[] = {
+  88          0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+  89          0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+  90          0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+  91          0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+  92          0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+  93          0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+  94          0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+  95          0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+  96          };
+  97          const UINT8 code text3[] = {
+  98          0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+  99          0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+ 100          0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+ 101          0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+ 102          0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+ 103          0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+ 104          0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+ 105          0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+ 106          };
+ 107          const UINT8 code text4[] = {
+ 108          0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+ 109          0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+ 110          0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+ 111          0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+ 112          0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+ 113          0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+ 114          0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+ 115          0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 3   
+
+ 116          };
+ 117          const UINT8 code text5[] = {
+ 118          0x44,0x08,0x58,0x06,0xC0,0x01,0xFF,0xFF,0x50,0x01,0x4C,0x86,0x00,0x60,0xFC,0x1F,
+ 119          0x44,0x00,0x54,0xFD,0x55,0x45,0xFE,0x47,0x54,0x45,0xF4,0xFD,0x44,0x00,0x00,0x00,/*"糖",0*/
+ 120          0x80,0x80,0x70,0x60,0x00,0x18,0xFF,0x07,0x20,0x08,0x10,0x30,0x00,0x81,0xC0,0x80,
+ 121          0x38,0x40,0x00,0x40,0xFF,0x27,0x00,0x10,0x08,0x0C,0x10,0x03,0x60,0x00,0x00,0x00,/*"炒",1*/
+ 122          0x00,0x44,0x02,0x44,0xF2,0x24,0x92,0x24,0x92,0x14,0xFE,0x0C,0x92,0x04,0x92,0xFF,
+ 123          0x92,0x04,0xFE,0x0C,0x92,0x14,0x92,0x24,0xF2,0x24,0x02,0x44,0x00,0x44,0x00,0x00,/*"栗",2*/
+ 124          0x80,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x00,0x82,0x40,0x82,0x80,0xE2,0x7F,
+ 125          0xA2,0x00,0x92,0x00,0x8A,0x00,0x86,0x00,0x82,0x00,0x80,0x00,0x80,0x00,0x00,0x00,/*"子",3*/
+ 126          };
+ 127          
+ 128          void main( ) 
+ 129          {
+ 130   1        UINT8 j=0;
+ 131   1        CfgFsys( );
+ 132   1        mDelaymS(20);
+ 133   1        
+ 134   1        Port3Cfg(1,2);
+ 135   1        Port1Cfg(1,4);
+ 136   1        Port1Cfg(1,1);
+ 137   1        
+ 138   1        LED = 0;  
+ 139   1        LED_Init();
+ 140   1        LED_colorWipe(30,0);
+ 141   1        LED_colorWipe(30,1);
+ 142   1        LED_colorWipe(30,2);
+ 143   1        LED_colorWipe(30,3);
+ 144   1        LED_colorWipe(30,4);
+ 145   1        LED_colorWipe(30,5);
+ 146   1        LED_colorWipe(30,6);
+ 147   1        LED_Rainbow();
+ 148   1        LED_begin();
+ 149   1        while(Button == 0);
+ 150   1        text_load(text0);
+ 151   1        count=0;
+ 152   1        while(1)
+ 153   1        {
+ 154   2          if(SSW==0){
+ 155   3          displayImage();
+ 156   3          while(SSW == 0);
+ 157   3          btnpress();
+ 158   3          }
+ 159   2          btnpress();
+ 160   2        }
+ 161   1      
+ 162   1      }
+ 163          
+ 164          void btnpress()
+ 165          {
+ 166   1          if (Button==0) {   // 如果按键按下
+ 167   2          mDelaymS(20);                        // 延迟20ms，去抖动
+ 168   2          if (Button==0) { // 再次检测按键是否按下，若按下则执行以下操作
+ 169   3            count++;  count%=6;            // 文字指针加1
+ 170   3            switch(count) {                 // 拷贝相应的文字
+ 171   4              case 0:
+ 172   4                text_load(text0);
+ 173   4                break;
+ 174   4              case 1: 
+ 175   4                text_load(text1);
+ 176   4                break;
+ 177   4              case 2:
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 4   
+
+ 178   4                text_load(text2);
+ 179   4                break;
+ 180   4              case 3:
+ 181   4                text_load(text3);
+ 182   4                break;
+ 183   4              case 4:
+ 184   4                text_load(text4);
+ 185   4                break;
+ 186   4              case 5:
+ 187   4                text_load(text5);
+ 188   4                break;
+ 189   4               default: 
+ 190   4                text_load(text0);
+ 191   4                break;
+ 192   4            }  //switch
+ 193   3            while(Button==0);   // 等待按键释放      
+ 194   3          } 
+ 195   2        }
+ 196   1      }
+ 197          
+ 198          
+ 199          void showImage()
+ 200          {
+ 201   1        UINT16 temp=0xffff;
+ 202   1        UINT8 i=0;
+ 203   1        UINT8 j=0;
+ 204   1        mDelaymS(80);
+ 205   1         for(i=0 ; i<64 ; i++){
+ 206   2          temp = (tempImage[i*2+1]<<8) + tempImage[i*2];  //将表示一列的两个字节数据存入temp
+ 207   2          for(j=0; j<16; j++){
+ 208   3              if (temp & 0x0001)    // 当前位需要点亮对应灯珠
+ 209   3              {
+ 210   4              Wheel(((((i * 256 / 15) + j + 80*flow)/8)&0xff));
+ 211   4              setPixelColor(15-j,Color_Array[8].green,Color_Array[8].red,Color_Array[8].blue);
+ 212   4              //setPixelColor(15-j,Color_Array[1].green,Color_Array[1].red,Color_Array[1].blue);            
+ 213   4              }
+ 214   3              else                           // 当前位不需要点亮对应灯珠
+ 215   3                setPixelColor(15-j,0,0,0);
+ 216   3              temp = temp>>1;                // 处理下一位数据
+ 217   3          }
+ 218   2          LED_show();                      // 处理完一列数据，刷新显示
+ 219   2        }
+ 220   1         for(i=0; i<16; i++)              // 熄灭所有灯珠
+ 221   1          setPixelColor(i,0,0,0);
+ 222   1        LED_show();                        // 刷新显示
+ 223   1        flow++;
+ 224   1      }
+ 225          
+ 226          void displayImage()
+ 227          {
+ 228   1        switch(count)
+ 229   1          {
+ 230   2          case 0:
+ 231   2          case 1:
+ 232   2          case 2:
+ 233   2          case 3:
+ 234   2          case 4:
+ 235   2          case 5: showImage();break;
+ 236   2          default:showImage();break;
+ 237   2          }
+ 238   1      }
+ 239          void text_load(const UINT8* imageArray)
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 5   
+
+ 240          {
+ 241   1        UINT8 i=0;
+ 242   1        for(i=0; i<160; i++)   //简单起见，始终拷贝连续5个汉字的数据
+ 243   1        tempImage[i]=imageArray[i];
+ 244   1      }
+ 245          void LED_Init()
+ 246          {
+ 247   1          LED_begin();
+ 248   1          LED_show();
+ 249   1          LED_setBrightness(30);
+ 250   1      }
+ 251          void LED_show()
+ 252          {
+ 253   1        Code_Reset();
+ 254   1      }
+ 255          void LED_begin()
+ 256          {
+ 257   1        UINT8 i;
+ 258   1        for(i=0;i<=numPixels;i++)
+ 259   1        {
+ 260   2        setPixelColor(numPixels,0x00,0x00,0x00);
+ 261   2        Code_Reset();
+ 262   2        }
+ 263   1        }
+ 264          
+ 265          void LED_Rainbow()
+ 266          {
+ 267   1        UINT8 i=0;
+ 268   1        UINT8 j=0;
+ 269   1        for(j=0;j<256*5;j++)
+ 270   1        {
+ 271   2        for(i=0;i<=numPixels;i++)
+ 272   2          {
+ 273   3          Wheel(((i*256/numPixels+j)&0xff));
+ 274   3            setPixelColor(i,Color_Array[8].green,Color_Array[8].red,Color_Array[8].blue);
+ 275   3          }
+ 276   2          //LED_show();
+ 277   2          mDelaymS(10);
+ 278   2          if((Button == 0)||(SSW == 0))break;
+ 279   2        }
+ 280   1      
+ 281   1      }
+ 282          
+ 283          void LED_colorWipe(UINT8 wait,UINT8 color_num)
+ 284          {
+ 285   1        UINT8 i=0;
+ 286   1        for(i=0;i<=numPixels;i++)
+ 287   1        {
+ 288   2          setPixelColor(i,Color_Array[color_num].green,Color_Array[color_num].red,Color_Array[color_num].blue);
+ 289   2          LED_show();
+ 290   2          mDelaymS(wait);
+ 291   2        }
+ 292   1      }
+ 293          
+ 294          void LED_setBrightness(UINT8 Brightness_Set)
+ 295          {
+ 296   1        UINT8 i=0;
+ 297   1        Brightness=Brightness_Set;
+ 298   1        for(i=0;i<=7;i++)
+ 299   1        {
+ 300   2          Color_Array[i].red   =Color_Array[i].red/256.0*Brightness;
+ 301   2          Color_Array[i].green =Color_Array[i].green/256.0*Brightness;
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 6   
+
+ 302   2          Color_Array[i].blue  =Color_Array[i].blue/256.0*Brightness;
+ 303   2        }
+ 304   1        
+ 305   1      }
+ 306          
+ 307          void setPixelColor(UINT8 Nums,UINT8 g,UINT8 r,UINT8 b)
+ 308          {
+ 309   1        UINT8 j=0;
+ 310   1        for(j=0;j<Nums;j++)
+ 311   1        {
+ 312   2          Send_Led_Data(0,0,0);
+ 313   2        }
+ 314   1        Send_Led_Data(g,r,b);
+ 315   1      }
+ 316          
+ 317          void Wheel(UINT8 WheelPos)
+ 318          {
+ 319   1        if(WheelPos < 85) {        // 若x<85,颜色设置为(3x,255-3x,0)
+ 320   2          Color_Array[8].red=(WheelPos * 3)/255.0*Brightness; 
+ 321   2          Color_Array[8].green=(255 - WheelPos * 3)/255.0*Brightness;
+ 322   2          Color_Array[8].blue=0;
+ 323   2        } 
+ 324   1        else if(WheelPos < 170) {  // 若85<=x<170,x=x-85，颜色设置为(255-3x,0,3x)
+ 325   2          WheelPos -= 85;
+ 326   2          Color_Array[8].red=(255 - WheelPos * 3)/255.0*Brightness;
+ 327   2          Color_Array[8].green=0;
+ 328   2          Color_Array[8].blue=(WheelPos * 3)/255.0*Brightness;
+ 329   2        } 
+ 330   1        else {                     // 若85x>=170,x=x-170，颜色设置为(0,3x,255-3x)  
+ 331   2          WheelPos -= 170;
+ 332   2          Color_Array[8].red=0;
+ 333   2          Color_Array[8].green=(WheelPos * 3)/255.0*Brightness;
+ 334   2          Color_Array[8].blue=(255 - WheelPos * 3)/255.0*Brightness;
+ 335   2        }
+ 336   1      }
+ 337          
+ 338          /*******************************************************************************
+ 339          * Function Name  : Send_Led_Data(UNIT8 g,UINT8 r,UINT8 b)
+ 340          * Description    : 发送LED灯数据
+ 341          * Input          : r(0-255) g(0-255) b(0-255) 代表256级亮度
+ 342          * Output         : 
+ 343          * Return         : None
+ 344          *******************************************************************************/ 
+ 345          void Send_Led_Data(UINT8 g,UINT8 r,UINT8 b)
+ 346          {
+ 347   1          UINT8 a;
+ 348   1         for(a=0;a<8;a++)
+ 349   1              {
+ 350   2                  if(g&0x80)
+ 351   2                    Code1();
+ 352   2                  else
+ 353   2                    Code0();
+ 354   2                  g=g<<1;
+ 355   2              }
+ 356   1              
+ 357   1          for(a=8;a<16;a++)
+ 358   1              {
+ 359   2                  if(r&0x80)
+ 360   2                    Code1();
+ 361   2                  else
+ 362   2                    Code0();
+ 363   2      
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 7   
+
+ 364   2                  r=r<<1;
+ 365   2              }
+ 366   1              
+ 367   1          for(a=16;a<24;a++)
+ 368   1              {
+ 369   2                  if(b&0x80)
+ 370   2                    Code1();
+ 371   2                  else
+ 372   2                    Code0();
+ 373   2      
+ 374   2                  b=b<<1;
+ 375   2              }
+ 376   1              
+ 377   1      }
+ 378          
+ 379          /*******************************************************************************
+ 380          * Function Name  : CfgFsys( )
+ 381          * Description    : CH554时钟选择和配置函数,默认使用Fsys 6MHz，FREQ_SYS可以通过
+ 382                             CLOCK_CFG配置得到，公式如下：
+ 383                             Fsys = (Fosc * 4/(CLOCK_CFG & MASK_SYS_CK_SEL);具体时钟需要自己配置 
+ 384          * Input          : None
+ 385          * Output         : None
+ 386          * Return         : None
+ 387          *******************************************************************************/ 
+ 388          void  CfgFsys( )  
+ 389          {
+ 390   1          SAFE_MOD = 0x55;
+ 391   1          SAFE_MOD = 0xAA;
+ 392   1      #if FREQ_SYS == 24000000  
+ 393   1          CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x06;  // 24MHz 
+ 394   1      #endif  
+ 395   1      #if FREQ_SYS == 16000000    
+                  CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x05;  // 16MHz 
+              #endif
+ 398   1      #if FREQ_SYS == 12000000    
+                  CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x04;  // 12MHz
+              #endif  
+ 401   1      #if FREQ_SYS == 6000000   
+                  CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x03;  // 6MHz  
+              #endif  
+ 404   1      #if FREQ_SYS == 3000000 
+                  CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x02;  // 3MHz  
+              #endif
+ 407   1      #if FREQ_SYS == 750000  
+                  CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x01;  // 750KHz
+              #endif
+ 410   1      #if FREQ_SYS == 187500  
+                  CLOCK_CFG = CLOCK_CFG & ~ MASK_SYS_CK_SEL | 0x00;  // 187.5KHz  
+              #endif
+ 413   1          SAFE_MOD = 0x00;
+ 414   1      }
+ 415          
+ 416          /*******************************************************************************
+ 417          * Function Name  : mDelayus(UNIT16 n)
+ 418          * Description    : us延时函数
+ 419          * Input          : UNIT16 n
+ 420          * Output         : None
+ 421          * Return         : None
+ 422          *******************************************************************************/ 
+ 423          void  mDelayuS( UINT16 n )  // 以uS为单位延时
+ 424          {
+ 425   1      #ifdef  FREQ_SYS
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 8   
+
+ 426   1      #if   FREQ_SYS <= 6000000
+                  n >>= 2;
+              #endif
+ 429   1      #if   FREQ_SYS <= 3000000
+                  n >>= 2;
+              #endif
+ 432   1      #if   FREQ_SYS <= 750000
+                  n >>= 4;
+              #endif
+ 435   1      #endif
+ 436   1        while ( n ) {  // total = 12~13 Fsys cycles, 1uS @Fsys=12MHz
+ 437   2          ++ SAFE_MOD;  // 2 Fsys cycles, for higher Fsys, add operation here
+ 438   2      #ifdef  FREQ_SYS
+ 439   2      #if   FREQ_SYS >= 14000000
+ 440   2          ++ SAFE_MOD;
+ 441   2      #endif
+ 442   2      #if   FREQ_SYS >= 16000000
+ 443   2          ++ SAFE_MOD;
+ 444   2      #endif
+ 445   2      #if   FREQ_SYS >= 18000000
+ 446   2          ++ SAFE_MOD;
+ 447   2      #endif
+ 448   2      #if   FREQ_SYS >= 20000000
+ 449   2          ++ SAFE_MOD;
+ 450   2      #endif
+ 451   2      #if   FREQ_SYS >= 22000000
+ 452   2          ++ SAFE_MOD;
+ 453   2      #endif
+ 454   2      #if   FREQ_SYS >= 24000000
+ 455   2          ++ SAFE_MOD;
+ 456   2      #endif
+ 457   2      #endif
+ 458   2          -- n;
+ 459   2        }
+ 460   1      }
+ 461          /*******************************************************************************
+ 462          * Function Name  : mDelayms(UNIT16 n)
+ 463          * Description    : ms延时函数
+ 464          * Input          : UNIT16 n
+ 465          * Output         : None
+ 466          * Return         : None
+ 467          *******************************************************************************/
+ 468          void  mDelaymS( UINT16 n )                                                  // 以mS为单位延时
+ 469          {
+ 470   1        while ( n ) {
+ 471   2      
+ 472   2          mDelayuS( 1000 );
+ 473   2          -- n;
+ 474   2        }
+ 475   1      }             
+ 476          /*******************************************************************************
+ 477          * Function Name  : Port1Cfg()
+ 478          * Description    : 端口1配置
+ 479          * Input          : Mode  0 = 浮空输入，无上拉
+ 480                                   1 = 推挽输入输出
+ 481                                   2 = 开漏输入输出，无上拉
+ 482                                   3 = 类51模式，开漏输入输出，有上拉，内部电路可以加速由低
+             -到高的电平爬升   
+ 483                             ,UINT8 Pin (0-7)                      
+ 484          * Output         : None
+ 485          * Return         : None
+ 486          *******************************************************************************/
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 9   
+
+ 487          void Port1Cfg(UINT8 Mode,UINT8 Pin)
+ 488          {
+ 489   1        switch(Mode){
+ 490   2          case 0:
+ 491   2            P1_MOD_OC = P1_MOD_OC & ~(1<<Pin);
+ 492   2            P1_DIR_PU = P1_DIR_PU & ~(1<<Pin);  
+ 493   2            break;
+ 494   2          case 1:
+ 495   2            P1_MOD_OC = P1_MOD_OC & ~(1<<Pin);
+ 496   2            P1_DIR_PU = P1_DIR_PU | (1<<Pin);       
+ 497   2            break;    
+ 498   2          case 2:
+ 499   2            P1_MOD_OC = P1_MOD_OC | (1<<Pin);
+ 500   2            P1_DIR_PU = P1_DIR_PU & ~(1<<Pin);        
+ 501   2            break;    
+ 502   2          case 3:
+ 503   2            P1_MOD_OC = P1_MOD_OC | (1<<Pin);
+ 504   2            P1_DIR_PU = P1_DIR_PU | (1<<Pin);     
+ 505   2            break;
+ 506   2          default:
+ 507   2            break;      
+ 508   2        }
+ 509   1      }
+ 510          
+ 511          /*******************************************************************************
+ 512          * Function Name  : Port3Cfg()
+ 513          * Description    : 端口3配置
+ 514          * Input          : Mode  0 = 浮空输入，无上拉
+ 515                                   1 = 推挽输入输出
+ 516                                   2 = 开漏输入输出，无上拉
+ 517                                   3 = 类51模式，开漏输入输出，有上拉，内部电路可以加速由低
+             -到高的电平爬升   
+ 518                             ,UINT8 Pin (0-7)                      
+ 519          * Output         : None
+ 520          * Return         : None
+ 521          *******************************************************************************/
+ 522          void Port3Cfg(UINT8 Mode,UINT8 Pin)
+ 523          {
+ 524   1        switch(Mode){
+ 525   2          case 0:
+ 526   2            P3_MOD_OC = P3_MOD_OC & ~(1<<Pin);
+ 527   2            P3_DIR_PU = P3_DIR_PU & ~(1<<Pin);  
+ 528   2            break;
+ 529   2          case 1:
+ 530   2            P3_MOD_OC = P3_MOD_OC & ~(1<<Pin);
+ 531   2            P3_DIR_PU = P3_DIR_PU | (1<<Pin);       
+ 532   2            break;    
+ 533   2          case 2:
+ 534   2            P3_MOD_OC = P3_MOD_OC | (1<<Pin);
+ 535   2            P3_DIR_PU = P3_DIR_PU & ~(1<<Pin);        
+ 536   2            break;    
+ 537   2          case 3:
+ 538   2            P3_MOD_OC = P3_MOD_OC | (1<<Pin);
+ 539   2            P3_DIR_PU = P3_DIR_PU | (1<<Pin);     
+ 540   2            break;
+ 541   2          default:
+ 542   2            break;      
+ 543   2        }
+ 544   1      }
+ 545          
+ 546          //实测 高电平340ns 低电平924s
+ 547          void Code0()
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2018 16:42:14 PAGE 10  
+
+ 548          {
+ 549   1      
+ 550   1        LED = 1;
+ 551   1        _nop_();_nop_();_nop_();_nop_();_nop_();_nop_();_nop_();
+ 552   1        LED = 0;
+ 553   1        _nop_();_nop_();_nop_();_nop_();_nop_();_nop_();
+ 554   1      }
+ 555          
+ 556          //实测 高电平620ns 低电平700ns
+ 557          void Code1()
+ 558          {
+ 559   1        LED = 1;
+ 560   1        _nop_();_nop_();_nop_();_nop_();_nop_();_nop_();
+ 561   1        _nop_();_nop_();_nop_();_nop_();_nop_();_nop_();_nop_();
+ 562   1        LED = 0;
+ 563   1        _nop_();
+ 564   1      }
+ 565          
+ 566          //实测 低电平50us
+ 567          void Code_Reset()
+ 568          {
+ 569   1        mDelayuS(35);
+ 570   1      }
+ 571          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2118    ----
+   CONSTANT SIZE    =    768    ----
+   XDATA SIZE       =    223      25
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
